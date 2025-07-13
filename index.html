@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot</title>
+    <link rel="stylesheet" href="/static/index.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="header">
+            <h2>AI Chatbot</h2>
+            <button id="clear-btn" onclick="clearChat()" title="Clear chat history">🗑️</button>
+        </div>
+        
+        <div class="chat-box" id="chat-box">
+            {% for message in history %}
+                <div class="message {{ message.role }}">
+                    <div class="message-content">
+                        <div class="message-text">{{ message.text }}</div>
+                        <div class="message-time">{{ message.timestamp }}</div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off" onkeypress="handleKeyPress(event)">
+            <button id="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            <div class="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function appendMessage(role, text, timestamp) {
+            const chatBox = document.getElementById('chat-box');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            
+            const time = timestamp || new Date().toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            div.innerHTML = `
+                <div class="message-content">
+                    <div class="message-text">${text}</div>
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+            
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const sendBtn = document.getElementById('send-btn');
+            const loading = document.getElementById('loading');
+            const message = input.value.trim();
+            
+            if (message === "") return;
+
+            // Disable input and button
+            input.disabled = true;
+            sendBtn.disabled = true;
+            
+            // Show user message
+            appendMessage("user", message);
+            input.value = "";
+
+            // Show loading indicator
+            loading.style.display = 'block';
+
+            try {
+                const response = await fetch("/ask", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message })
+                });
+
+                const data = await response.json();
+                appendMessage("bot", data.reply);
+            } catch (error) {
+                appendMessage("bot", "Sorry, I encountered an error. Please try again.");
+                console.error('Error:', error);
+            } finally {
+                // Re-enable input and button
+                input.disabled = false;
+                sendBtn.disabled = false;
+                loading.style.display = 'none';
+                input.focus();
+            }
+        }
+
+        async function clearChat() {
+            try {
+                await fetch("/clear", { method: "POST" });
+                document.getElementById('chat-box').innerHTML = '';
+            } catch (error) {
+                console.error('Error clearing chat:', error);
+            }
+        }
+
+        // Focus on input when page loads
+        window.onload = function() {
+            document.getElementById('user-input').focus();
+        };
+    </script>
+</body>
+</html>
